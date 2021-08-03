@@ -257,6 +257,125 @@ jobs:
       - revert-migrations:
           workflow_id: ${CIRCLE_WORKFLOW_ID}
 
+  deploy-frontend:
+    docker:
+        - image: amazon/aws-cli
+    steps:
+      - checkout
+      - restore_cache:
+          keys: [frontend-build]
+      - run:
+          name: Install dependencies
+          command: |
+            yum install -y curl tar gzip sudo
+            # Install Nodejs
+            curl -sL https://rpm.nodesource.com/setup_13.x | sudo bash -
+            yum install -y nodejs
+      - run:
+          name: Get backend url
+          command: |
+            # your code here
+            BACKEND_URL=$(curl -H "token: udapeople-project3-BackendURL-${CIRCLE_WORKFLOW_ID}" --request GET https://api.memstash.io/values/BackendURL_${CIRCLE_WORKFLOW_ID})
+            export API_URL="http://${BACKEND_URL}:3030"
+            echo "${API_URL}" >> .circleci/Backend_URL.txt
+      - run:
+          name: Deploy frontend objects
+          command: |
+            export API_URL=$(cat .circleci/Backend_URL.txt)
+            echo "${API_URL}" > frontend/.env
+            cd frontend
+            npm i
+            npm run build
+            aws s3 cp dist s3://udapeople-"${CIRCLE_WORKFLOW_ID}" --recursive
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID}
+      - revert-migrations:
+          workflow_id: ${CIRCLE_WORKFLOW_ID}
+         
+  deploy-backend:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["29:69:fc:dc:81:74:5b:9e:5f:a0:a2:63:cf:8b:f2:9c"]      # Add ssh keys with fingerprint
+      - restore_cache:
+          keys: [backend-build]
+      - attach_workspace:
+          at: /tmp/.circleci/ansible
+      - run:
+          name: Install dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install python3
+            sudo apt-get install ansible
+            sudo apt-get install awscli            
+      - run:
+          name: Deploy backend
+          command: |
+            echo ENVIROMENT=production >> "backend/.env"
+            echo TYPEORM_CONNECTION=postgres >> "backend/.env"
+            echo TYPEORM_MIGRATIONS_DIR=./src/migrations >> "backend/.env"
+            echo TYPEORM_ENTITIES=./src/modules/domain/**/*.entity.ts >> "backend/.env"
+            echo TYPEORM_MIGRATIONS=./src/migrations/*.ts >> "backend/.env"
+            echo TYPEORM_HOST=$TYPEORM_HOST >> "backend/.env"
+            echo TYPEORM_PORT=$TYPEORM_PORT >> "backend/.env"
+            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> "backend/.env"
+            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> "backend/.env"
+            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> "backend/.env"
+            
+            tar -C backend -czvf backend.tar.gz .
+            
+            cat /tmp/.circleci/ansible/inventory.txt
+                        
+            export ANSIBLE_HOST_KEY_CHECKING=False
+            ansible-playbook -i  /tmp/.circleci/ansible/inventory.txt .circleci/ansible/deploy-backend.yml
+      # Here's where you will add some code to rollback on failure
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID}
+      - revert-migrations:
+          workflow_id: ${CIRCLE_WORKFLOW_ID}
+
+  smoke-test:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            sudo apt update
+            sudo apt install -y awscli
+            sudo apt install -y python3 ansible
+      - run:
+          name: Get backend url
+          command: |          
+              curl -H "token: udapeople-project3-BackendURL-${CIRCLE_WORKFLOW_ID}" \
+                --request GET https://api.memstash.io/values/BackendURL_${CIRCLE_WORKFLOW_ID} \
+                > .circleci/Backend_URL.txt
+      - run:
+          name: Backend smoke test.
+          command: |
+            url=$(cat .circleci/Backend_URL.txt)
+            url="http://${url}:3030/api/status"
+            echo $url
+            curl $url
+      - run:
+          name: Frontend smoke test.
+          command: |
+            URL="http://udapeople-${CIRCLE_WORKFLOW_ID}.s3-website-us-west-2.amazonaws.com"
+            echo " URL " $URL
+            if curl -s ${URL} | grep "Welcome"
+            then
+              echo "Successful front-end Smoke-test" 
+            else
+              echo "Unsuccessful front-end Smoke-test"
+            fi
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID}
+      - revert-migrations:
+          workflow_id: ${CIRCLE_WORKFLOW_ID}
+
 workflows:
   default:
     jobs:
@@ -276,3 +395,9 @@ workflows:
           requires: [deploy-infrastructure]
       - run-migrations:
           requires: [configure-infrastructure]
+      - deploy-frontend:
+          requires: [run-migrations]
+      - deploy-backend:
+          requires: [run-migrations]
+      - smoke-test:
+          requires: [deploy-backend, deploy-frontend]
