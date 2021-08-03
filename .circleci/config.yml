@@ -368,7 +368,6 @@ jobs:
             if curl -s ${URL} | grep "Welcome"
             then
               echo "Successful front-end Smoke-test"
-              exit 1
             else
               echo "Unsuccessful front-end Smoke-test"
               exit 1
@@ -378,6 +377,69 @@ jobs:
       - revert-migrations:
           workflow_id: ${CIRCLE_WORKFLOW_ID}
 
+  cloudfront-update:
+    docker:
+        - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            yum install -y curl
+            
+      - run:
+          name: Get old stack workflow id
+          command: |
+            # your code here
+            OldWorkflowID=$(aws cloudformation \
+                          list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
+                          --no-paginate --output text | tr -d '\n')
+            echo $OldWorkflowID               
+            curl -H "Content-Type: text/plain" -H "token: udapeople-project3-OldWorkflowID-${CIRCLE_WORKFLOW_ID}" \
+                        --request PUT --data "${OldWorkflowID}" \
+                        https://api.memstash.io/values/OldWorkflowID_${CIRCLE_WORKFLOW_ID}            
+      - run:
+          name: Update cloudfront distribution
+          command: |
+              aws cloudformation deploy \
+              --template-file .circleci/files/cloudfront.yml \
+              --stack-name udapeople-cloudfront \
+              --tags project=udapeople-project3 \
+              --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID}"       
+              
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID}
+      - revert-migrations:
+          workflow_id: ${CIRCLE_WORKFLOW_ID}          
+      
+  cleanup:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Cleanup the Environment for Old Workflow ID
+          command: |
+            # get old WorkFlowId            
+            export OldWorkflowID=$(curl -H "token: udapeople-project3-OldWorkflowID-${CIRCLE_WORKFLOW_ID}" --request GET https://api.memstash.io/values/OldWorkflowID_${CIRCLE_WORKFLOW_ID})
+            echo "Old Workflow ID: " $OldWorkflowID
+            
+            # get all stacks
+            export STACKS=($(aws cloudformation list-stacks --query "StackSummaries[*].StackName" \
+              --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE --no-paginate --output text))
+              
+            echo "Stacks: "  ${STACKS[@]}
+            echo "No of Stack items: "  ${#STACKS[@]}
+            for ((i=0;i<${#STACKS[@]};i++))
+              do           
+                 echo "Stacks: "  ${STACKS[i]:13}
+                 if [[ "${STACKS[i]:13}" =~ "${OldWorkflowID}" ]]
+                 then
+                    aws s3 rm s3://udapeople-"${STACKS[i]:13}" --recursive
+                    aws cloudformation delete-stack --stack-name udapeople-fe-"${STACKS[i]:13}"
+                    aws cloudformation delete-stack --stack-name udapeople-be-"${STACKS[i]:13}"
+                 fi
+              done
 workflows:
   default:
     jobs:
@@ -403,3 +465,7 @@ workflows:
           requires: [run-migrations]
       - smoke-test:
           requires: [deploy-backend, deploy-frontend]
+      - cloudfront-update:
+          requires: [smoke-test]
+      - cleanup:
+          requires: [cloudfront-update]
