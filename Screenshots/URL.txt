@@ -1,0 +1,5 @@
+URL01: https://github.com/vikasengg/Udapeople-Proj3
+URL02: https://s3.console.aws.amazon.com/s3/buckets/udapeople-9c777f79-e1f9-41f3-a790-42fcdfa9b01d?region=us-west-2&tab=objects
+URL03: https://d4eg5c18jlo4v.cloudfront.net
+URL04: 54.190.197.186
+URL05: http://ec2-35-160-136-237.us-west-2.compute.amazonaws.com:9090/targets
