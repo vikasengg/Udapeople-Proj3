@@ -19,6 +19,7 @@ jobs:
       - save_cache:
           paths: [frontend/node_modules]
           key: frontend-build
+      - slack/status
                  
   build-backend:
     docker:
@@ -37,6 +38,7 @@ jobs:
       - save_cache:
           paths: [backend/node_modules]
           key: backend-build
+      - slack/status
           
   test-frontend:
     docker:
@@ -54,6 +56,7 @@ jobs:
       - save_cache:
           paths: [frontend/node_modules]
           key: frontend-test
+      - slack/status
                 
   test-backend:
     docker:
@@ -71,6 +74,7 @@ jobs:
       - save_cache:
           paths: [backend/node_modules]
           key: backend-test
+      - slack/status
           
   scan-frontend:
     docker:
@@ -84,10 +88,11 @@ jobs:
           command: |
              cd frontend
              npm install
-             npm audit --audit-level=critical
+             npm audit fix --audit-level=critical --force
       - save_cache:
           paths: [frontend/node_modules]
           key: frontend-scan
+      - slack/status
 
   scan-backend:
     docker:
@@ -101,10 +106,11 @@ jobs:
           command: |
              cd backend
              npm install
-             npm audit --audit-level=critical
+             npm audit fix --audit-level=critical --force
       - save_cache:
           paths: [backend/node_modules]
           key: backend-scan
+      - slack/status
 
 workflows:
   default:
