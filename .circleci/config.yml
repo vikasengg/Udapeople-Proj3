@@ -367,9 +367,11 @@ jobs:
             echo " URL " $URL
             if curl -s ${URL} | grep "Welcome"
             then
-              echo "Successful front-end Smoke-test" 
+              echo "Successful front-end Smoke-test"
+              exit 1
             else
               echo "Unsuccessful front-end Smoke-test"
+              exit 1
             fi
       - destroy-environment:
           workflow_id: ${CIRCLE_WORKFLOW_ID}
