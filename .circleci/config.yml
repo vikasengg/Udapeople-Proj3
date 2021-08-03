@@ -3,6 +3,46 @@ version: 2.1
 orbs:
   node: circleci/node@3.0.0
   slack: circleci/slack@3.4.2
+  
+commands:          
+  destroy-environment:
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
+    parameters:
+      # Add parameter here
+      workflow_id:
+        type: string
+    steps:
+      - run:
+          name: Destroy environments
+          when: on_fail
+          command: |
+            # Delete the S3 buckets. 
+            aws s3 rb s3://udapeople-<<parameters.workflow_id>> --force                 
+            
+            # Delete the stacks
+            aws cloudformation delete-stack --stack-name udapeople-be-<<parameters.workflow_id>>
+            aws cloudformation delete-stack --stack-name udapeople-fe-<<parameters.workflow_id>>
+            
+  revert-migrations:
+    description: Revert the last migration if successfully run in the current workflow.
+    parameters:
+      workflow_id:
+        type: string
+    steps:
+      - run:
+          name: Revert migrations
+          # Add when this will run 
+          when: on_fail
+          command: |
+            # Curl command here to see if there was a successful migration associated with the workflow id, store result in SUCCESS variable
+            SUCCESS=$(curl -H "token: udapeople-project3-migration-<<parameters.workflow_id>>" --request GET https://api.memstash.io/values/migration_<<parameters.workflow_id>>)
+            if(( $SUCCESS==1 )); 
+            then
+              cd ~/project/backend
+              npm install
+              # Add revert code here. You can find this in the Getting Started section.<done>
+              npm run migrations:revert
+            fi
 
 jobs:
   build-frontend:
