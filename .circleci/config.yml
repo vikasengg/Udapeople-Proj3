@@ -402,7 +402,7 @@ jobs:
       - run:
           name: Update cloudfront distribution
           command: |
-            aws cloudformation deploy \ 
+              aws cloudformation deploy \
               --template-file .circleci/files/cloudfront.yml \
               --stack-name udapeople-cloudfront \
               --tags project=udapeople-project3 \
@@ -412,7 +412,7 @@ jobs:
           workflow_id: ${CIRCLE_WORKFLOW_ID}
       - revert-migrations:
           workflow_id: ${CIRCLE_WORKFLOW_ID}          
-      
+       
   cleanup:
     docker:
       - image: amazon/aws-cli
