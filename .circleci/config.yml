@@ -276,7 +276,7 @@ jobs:
           command: |
             # your code here
             BACKEND_URL=$(curl -H "token: udapeople-project3-BackendURL-${CIRCLE_WORKFLOW_ID}" --request GET https://api.memstash.io/values/BackendURL_${CIRCLE_WORKFLOW_ID})
-            export API_URL="http://${BACKEND_URL}:3030"
+            export API_URL="https://${BACKEND_URL}:3030"
             echo "${API_URL}" >> .circleci/Backend_URL.txt
       - run:
           name: Deploy frontend objects
@@ -357,13 +357,13 @@ jobs:
           name: Backend smoke test.
           command: |
             url=$(cat .circleci/Backend_URL.txt)
-            url="http://${url}:3030/api/status"
+            url="https://${url}:3030/api/status"
             echo $url
             curl $url
       - run:
           name: Frontend smoke test.
           command: |
-            URL="http://udapeople-${CIRCLE_WORKFLOW_ID}.s3-website-us-west-2.amazonaws.com"
+            URL="https://udapeople-${CIRCLE_WORKFLOW_ID}.s3-website-us-west-2.amazonaws.com"
             echo " URL " $URL
             if curl -s ${URL} | grep "Welcome"
             then
